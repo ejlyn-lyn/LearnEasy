@@ -13,6 +13,7 @@ export default function RegisterPage() {
     event.preventDefault();
     setLoading(true);
     setMessage("");
+    const domain = email.trim().toLowerCase().split("@")[1];
 
     const supabase = createClient();
     const { error } = await supabase.auth.signUp({

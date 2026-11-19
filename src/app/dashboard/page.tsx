@@ -13,7 +13,23 @@ async function DashboardContent() {
 
   if (!user) redirect("/login");
 
-  return <DashboardClient email={user.email ?? ""} />;
+  const [profile, modules, sessions, materials] = await Promise.all([
+    supabase.from("profiles").select("display_name, xp").eq("id", user.id).maybeSingle(),
+    supabase.from("modules").select("id, name, description, subject, is_it_module, is_private").eq("owner_id", user.id).order("created_at"),
+    supabase.from("sessions").select("id, name, activity_type, privacy, module_id").eq("owner_id", user.id).order("created_at", { ascending: false }),
+    supabase.from("materials").select("id, name, file_type, size_bytes, ai_status, module_id, session_id").eq("owner_id", user.id).order("created_at", { ascending: false }),
+  ]);
+
+  return (
+    <DashboardClient
+      email={user.email ?? ""}
+      displayName={profile.data?.display_name ?? user.email?.split("@")[0] ?? "Lernende"}
+      xp={profile.data?.xp ?? 0}
+      modules={modules.data ?? []}
+      sessions={sessions.data ?? []}
+      materials={materials.data ?? []}
+    />
+  );
 }
 
 export default function DashboardPage() {
