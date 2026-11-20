@@ -15,9 +15,10 @@ type Module = {
 };
 type Session = { id: string; name: string; activity_type: string; privacy: string; module_id: string };
 type Material = { id: string; name: string; file_type: string | null; size_bytes: number; ai_status: string; module_id: string; session_id: string | null };
-type Props = { email: string; displayName: string; xp: number; modules: Module[]; sessions: Session[]; materials: Material[] };
+type Deck = { id: string; title: string; session_id: string | null };
+type Props = { email: string; displayName: string; xp: number; modules: Module[]; sessions: Session[]; materials: Material[]; decks: Deck[] };
 
-export default function DashboardClient({ email, displayName, xp, modules, sessions, materials }: Props) {
+export default function DashboardClient({ email, displayName, xp, modules, sessions, materials, decks }: Props) {
   const router = useRouter();
   const [activeNav, setActiveNav] = useState("Dashboard");
   const [moduleOpen, setModuleOpen] = useState(false);
@@ -40,6 +41,17 @@ export default function DashboardClient({ email, displayName, xp, modules, sessi
   const level = Math.floor(xp / 300) + 1;
   const levelProgress = xp % 300;
   const initials = displayName.slice(0, 2).toUpperCase();
+  const deckBySessionId = new Map(
+    decks
+      .filter((deck) => deck.session_id)
+      .map((deck) => [deck.session_id as string, deck]),
+  );
+  const findDeckForSession = (session: Session) =>
+    deckBySessionId.get(session.id) ??
+    decks.find((deck) =>
+      deck.title.toLowerCase().includes(session.name.toLowerCase()) ||
+      session.name.toLowerCase().includes(deck.title.toLowerCase()),
+    );
 
   async function createModule(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -233,10 +245,20 @@ export default function DashboardClient({ email, displayName, xp, modules, sessi
               ) : (
                 <div className="activity-list">
                   {sessions.slice(0, 5).map((session) => (
-                    <div className="activity-item" key={session.id}>
+                    (() => {
+                      const deck = findDeckForSession(session);
+                      return (
+                    <Link
+                      className={`activity-item ${deck ? "activity-item-link" : ""}`}
+                      href={deck ? `/session/${deck.id}` : "#"}
+                      key={session.id}
+                    >
                       <div className="activity-icon">{session.activity_type === "karteikarten" ? "A" : "✓"}</div>
                       <div className="activity-text"><strong>{session.name}</strong><span>{session.activity_type} · {session.privacy === "private" ? "Privat" : "Öffentlich"}</span></div>
-                    </div>
+                      {deck && <span className="activity-open">Lernen →</span>}
+                    </Link>
+                      );
+                    })()
                   ))}
                 </div>
               )}

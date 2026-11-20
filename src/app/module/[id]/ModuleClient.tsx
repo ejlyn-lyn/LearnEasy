@@ -20,6 +20,7 @@ export default function ModuleClient({ moduleId, moduleName, initialMaterials }:
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [generated, setGenerated] = useState("");
+  const [working, setWorking] = useState(false);
 
   async function upload(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -58,13 +59,24 @@ export default function ModuleClient({ moduleId, moduleName, initialMaterials }:
     setSelected((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
   }
 
-  function generate() {
+  async function generate(action = "zusammenfassung") {
     if (selected.length === 0) {
       setMessage("Wähle mindestens eine Unterlage aus.");
       return;
     }
-    const names = initialMaterials.filter((material) => selected.includes(material.id)).map((material) => material.name);
-    setGenerated(`Lernübersicht für „${moduleName}“\n\nAusgewählte Unterlagen:\n${names.map((name) => `• ${name}`).join("\n")}\n\nNächste Schritte:\n• Begriffe und Kernaussagen wiederholen\n• Zwei Übungsfragen zu jedem Abschnitt beantworten\n• Unklare Punkte mit der Quelle abgleichen\n\nHinweis: Eine externe KI ist noch nicht verbunden. Die Verarbeitung soll später nur die ausgewählten Unterlagen nutzen.`);
+    setWorking(true);
+    setMessage("");
+    const response = await fetch("/api/ai/materials", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ materialIds: selected, action }),
+    });
+    const data = await response.json();
+    if (!response.ok) setMessage(data.error ?? "Die KI konnte nicht gestartet werden.");
+    else {
+      setGenerated(`# ${moduleName}\n\n${data.output}`);
+    }
+    setWorking(false);
   }
 
   return (
@@ -86,6 +98,13 @@ export default function ModuleClient({ moduleId, moduleName, initialMaterials }:
         ) : (
           <>
             <div className="material-select-list">
+              <button
+                className="text-button all-materials-button"
+                type="button"
+                onClick={() => setSelected(selected.length === initialMaterials.length ? [] : initialMaterials.map((material) => material.id))}
+              >
+                {selected.length === initialMaterials.length ? "Auswahl aufheben" : "Alle Unterlagen auswählen"}
+              </button>
               {initialMaterials.map((material) => (
                 <label className="material-select" key={material.id}>
                   <input type="checkbox" checked={selected.includes(material.id)} onChange={() => toggle(material.id)} />
@@ -93,10 +112,16 @@ export default function ModuleClient({ moduleId, moduleName, initialMaterials }:
                 </label>
               ))}
             </div>
-            <button className="primary-button full-button" type="button" onClick={generate}>Zusammenfassung vorbereiten</button>
+            <div className="ai-action-grid">
+              <button className="primary-button" disabled={working} type="button" onClick={() => generate("zusammenfassung")}>Zusammenfassung</button>
+              <button className="secondary-button" disabled={working} type="button" onClick={() => generate("quiz")}>Quiz</button>
+              <button className="secondary-button" disabled={working} type="button" onClick={() => generate("lernplan")}>7-Tage-Plan</button>
+            </div>
           </>
         )}
-        {generated && <pre className="ai-output">{generated}</pre>}
+        {generated ? (
+          <pre className="ai-output">{generated}</pre>
+        ) : null}
       </div>
     </section>
   );

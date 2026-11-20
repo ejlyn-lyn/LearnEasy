@@ -13,11 +13,12 @@ async function DashboardContent() {
 
   if (!user) redirect("/login");
 
-  const [profile, modules, sessions, materials] = await Promise.all([
+  const [profile, modules, sessions, materials, decks] = await Promise.all([
     supabase.from("profiles").select("display_name, xp").eq("id", user.id).maybeSingle(),
     supabase.from("modules").select("id, name, description, subject, is_it_module, is_private").eq("owner_id", user.id).order("created_at"),
     supabase.from("sessions").select("id, name, activity_type, privacy, module_id").eq("owner_id", user.id).order("created_at", { ascending: false }),
     supabase.from("materials").select("id, name, file_type, size_bytes, ai_status, module_id, session_id").eq("owner_id", user.id).order("created_at", { ascending: false }),
+    supabase.from("flashcard_decks").select("id, title, session_id").eq("owner_id", user.id).order("created_at", { ascending: false }),
   ]);
 
   return (
@@ -28,6 +29,7 @@ async function DashboardContent() {
       modules={modules.data ?? []}
       sessions={sessions.data ?? []}
       materials={materials.data ?? []}
+      decks={decks.data ?? []}
     />
   );
 }

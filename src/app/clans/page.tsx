@@ -1,24 +1,31 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-
-export const instant = false;
+import ClansClient from "./ClansClient";
 
 export default async function ClansPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+  const [{ data: profile }, membership] = await Promise.all([
+    supabase.from("profiles").select("friend_code, xp").eq("id", user.id).maybeSingle(),
+    supabase.from("clan_memberships").select("clan_id, role").eq("user_id", user.id).maybeSingle(),
+  ]);
+  const friendCode = profile?.friend_code
+    ?? user.id.replace(/-/g, "").slice(0, 8).toUpperCase();
+  let clan = null;
+  if (membership.data?.clan_id) {
+    const result = await supabase
+      .from("clans")
+      .select("id, name, join_code, xp")
+      .eq("id", membership.data.clan_id)
+      .maybeSingle();
+    clan = result.data;
+  }
+  const { data: topClans } = await supabase
+    .from("clans")
+    .select("id, name, xp")
+    .order("xp", { ascending: false })
+    .limit(10);
 
-  return (
-    <main className="module-page">
-      <div className="module-page-inner">
-        <Link className="back-link" href="/dashboard">← Zum Dashboard</Link>
-        <header className="module-detail-header"><div><p className="eyebrow">GEMEINSCHAFT</p><h1>Clans & Ranglisten</h1><p>Gemeinsam lernen und Fortschritt vergleichen</p></div></header>
-        <div className="module-detail-grid">
-          <section className="panel module-detail-panel"><div className="panel-heading"><div><h2>Mein Clan</h2><p>Noch kein Clan</p></div></div><button className="primary-button full-button" type="button" disabled>Clan erstellen</button></section>
-          <section className="panel module-detail-panel"><div className="panel-heading"><div><h2>Wöchentliche Rangliste</h2><p>Deine Platzierung</p></div></div><p className="empty-state">Sobald Aufgaben und Quizzes bewertet werden, erscheint hier dein Rang.</p></section>
-        </div>
-      </div>
-    </main>
-  );
+  return <ClansClient friendCode={friendCode} xp={profile?.xp ?? 0} clan={clan} topClans={topClans ?? []} />;
 }

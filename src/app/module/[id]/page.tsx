@@ -2,10 +2,9 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import ModuleClient from "./ModuleClient";
+import FlashcardSessionCreator from "./FlashcardSessionCreator";
 
 type Props = { params: Promise<{ id: string }> };
-
-export const instant = false;
 
 export default async function ModulePage({ params }: Props) {
   const { id } = await params;
@@ -25,7 +24,7 @@ export default async function ModulePage({ params }: Props) {
 
   if (moduleError || !module) redirect("/dashboard");
 
-  const [sessionsResult, materialsResult] = await Promise.all([
+  const [sessionsResult, materialsResult, decksResult] = await Promise.all([
     supabase
       .from("sessions")
       .select("id, name, activity_type, privacy, created_at")
@@ -38,10 +37,28 @@ export default async function ModulePage({ params }: Props) {
       .eq("module_id", id)
       .eq("owner_id", user.id)
       .order("created_at", { ascending: false }),
+    supabase
+      .from("flashcard_decks")
+      .select("id, title, session_id")
+      .eq("module_id", id)
+      .eq("owner_id", user.id)
+      .order("created_at", { ascending: false }),
   ]);
 
   const sessions = sessionsResult.data ?? [];
   const materials = materialsResult.data ?? [];
+  const decks = decksResult.data ?? [];
+  const deckBySessionId = new Map(
+    decks
+      .filter((deck) => deck.session_id)
+      .map((deck) => [deck.session_id as string, deck]),
+  );
+  const findDeckForSession = (session: (typeof sessions)[number]) =>
+    deckBySessionId.get(session.id) ??
+    decks.find((deck) =>
+      deck.title.toLowerCase().includes(session.name.toLowerCase()) ||
+      session.name.toLowerCase().includes(deck.title.toLowerCase()),
+    );
 
   return (
     <main className="module-page">
@@ -92,15 +109,43 @@ export default async function ModulePage({ params }: Props) {
         <div className="module-detail-grid">
           <section className="panel module-detail-panel">
             <div className="panel-heading"><div><h2>Unterrichtssessions</h2><p>{sessions.length} Session(s)</p></div></div>
+            {materials.length > 0 && (
+              <FlashcardSessionCreator
+                moduleId={module.id}
+                initialMaterials={materials.map((material) => ({ id: material.id, name: material.name }))}
+              />
+            )}
+            {decks.length > 0 && (
+              <div className="session-card-list module-deck-list">
+                {decks.map((deck) => (
+                  <Link className="session-card" href={`/session/${deck.id}`} key={deck.id}>
+                    <span className="activity-icon">A</span>
+                    <div><strong>{deck.title}</strong><small>Karteikarten-Session öffnen</small></div>
+                    <span>→</span>
+                  </Link>
+                ))}
+              </div>
+            )}
             {sessions.length === 0 ? (
               <p className="empty-state">Für dieses Modul wurde noch keine Unterrichtssession erstellt.</p>
             ) : (
               <div className="activity-list">
                 {sessions.map((session) => (
-                  <article className="activity-item" key={session.id}>
-                    <div className="activity-icon">{session.activity_type === "karteikarten" ? "A" : "✓"}</div>
-                    <div className="activity-text"><strong>{session.name}</strong><span>{session.activity_type} · {session.privacy === "private" ? "Privat" : "Öffentlich"}</span></div>
-                  </article>
+                  (() => {
+                    const deck = findDeckForSession(session);
+                    return (
+                      <Link
+                        className={`activity-item ${deck ? "activity-item-link" : ""}`}
+                        href={deck ? `/session/${deck.id}` : "#"}
+                        key={session.id}
+                        aria-disabled={!deck}
+                      >
+                        <div className="activity-icon">{session.activity_type === "karteikarten" ? "A" : "✓"}</div>
+                        <div className="activity-text"><strong>{session.name}</strong><span>{session.activity_type} · {session.privacy === "private" ? "Privat" : "Öffentlich"}</span></div>
+                        {deck && <span className="activity-open">Lernen →</span>}
+                      </Link>
+                    );
+                  })()
                 ))}
               </div>
             )}

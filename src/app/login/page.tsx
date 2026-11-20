@@ -8,7 +8,11 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState(
+    searchParams.get("error") === "auth"
+      ? "Die Anmeldung konnte nicht bestätigt werden. Bitte registriere dich erneut oder melde dich mit E-Mail und Passwort an."
+      : "",
+  );
   const [loading, setLoading] = useState(false);
 
   async function login(event: React.FormEvent<HTMLFormElement>) {
