@@ -34,6 +34,8 @@ export async function proxy(request: NextRequest) {
     request.nextUrl.pathname.startsWith("/module") ||
     request.nextUrl.pathname.startsWith("/englisch") ||
     request.nextUrl.pathname.startsWith("/clans") ||
+    request.nextUrl.pathname.startsWith("/fortschritt") ||
+    request.nextUrl.pathname.startsWith("/abzeichen") ||
     request.nextUrl.pathname.startsWith("/profil") ||
     request.nextUrl.pathname.startsWith("/einstellungen");
 
@@ -48,5 +50,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/module/:path*", "/englisch/:path*", "/clans/:path*", "/profil/:path*", "/einstellungen/:path*"],
+  matcher: ["/dashboard/:path*", "/module/:path*", "/englisch/:path*", "/clans/:path*", "/fortschritt/:path*", "/abzeichen/:path*", "/profil/:path*", "/einstellungen/:path*"],
 };

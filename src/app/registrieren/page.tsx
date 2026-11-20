@@ -13,15 +13,27 @@ export default function RegisterPage() {
     event.preventDefault();
     setLoading(true);
     setMessage("");
+    const normalizedEmail = email.trim();
+    const name = normalizedEmail.split("@")[0] || "Lernende";
 
     const supabase = createClient();
-    const { error } = await supabase.auth.signUp({
-      email,
+    const { data, error } = await supabase.auth.signUp({
+      email: normalizedEmail,
       password,
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
+        data: { name },
+      },
     });
 
-    setMessage(error?.message ?? "Prüfe dein E-Mail-Postfach und bestätige dein Konto.");
+    if (error) {
+      setMessage(error.message);
+    } else if (data.session) {
+      window.location.assign("/dashboard");
+      return;
+    } else {
+      setMessage("Prüfe dein E-Mail-Postfach und bestätige dein Konto. Danach kannst du dich anmelden.");
+    }
     setLoading(false);
   }
 
