@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 export default function RegisterPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [inviteCode, setInviteCode] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -17,6 +18,21 @@ export default function RegisterPage() {
     const name = normalizedEmail.split("@")[0] || "Lernende";
 
     const supabase = createClient();
+    const { data: inviteResult, error: inviteError } = await supabase.rpc("reserve_invite", {
+      p_code: inviteCode,
+      p_email: normalizedEmail,
+    });
+    if (inviteError) {
+      setMessage("Der Einladungscode konnte nicht geprüft werden.");
+      setLoading(false);
+      return;
+    }
+    if (inviteResult !== "OK") {
+      setMessage("Dieser Einladungscode ist ungültig, bereits verwendet oder für eine andere E-Mail reserviert.");
+      setLoading(false);
+      return;
+    }
+
     const { data, error } = await supabase.auth.signUp({
       email: normalizedEmail,
       password,
@@ -41,8 +57,9 @@ export default function RegisterPage() {
     <main className="min-h-screen bg-[#090b12] px-5 py-10 text-white">
       <div className="mx-auto mt-10 max-w-md rounded-2xl border border-[#222a3d] bg-[#111520] p-8">
         <h1 className="text-3xl font-bold">Konto erstellen</h1>
-        <p className="mt-2 text-sm text-zinc-400">In V1 ist die Registrierung später zusätzlich auf gültige Einladungen beschränkt.</p>
+        <p className="mt-2 text-sm text-zinc-400">Die Registrierung ist nur mit einem persönlichen Einladungscode möglich.</p>
         <form onSubmit={register} className="mt-8 space-y-5">
+          <label className="block text-sm text-zinc-300">Einladungscode<input required value={inviteCode} onChange={(event) => setInviteCode(event.target.value)} maxLength={32} className="mt-2 w-full uppercase rounded-lg border border-[#30384d] bg-[#171b28] px-4 py-3 outline-none focus:border-violet-500" placeholder="Einladungscode eingeben" /></label>
           <label className="block text-sm text-zinc-300">E-Mail-Adresse<input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} className="mt-2 w-full rounded-lg border border-[#30384d] bg-[#171b28] px-4 py-3 outline-none focus:border-violet-500" /></label>
           <label className="block text-sm text-zinc-300">Passwort (mindestens 8 Zeichen)<input required minLength={8} type="password" value={password} onChange={(event) => setPassword(event.target.value)} className="mt-2 w-full rounded-lg border border-[#30384d] bg-[#171b28] px-4 py-3 outline-none focus:border-violet-500" /></label>
           {message && <p role="status" className="rounded-lg border border-violet-900 bg-violet-950/40 px-4 py-3 text-sm">{message}</p>}
