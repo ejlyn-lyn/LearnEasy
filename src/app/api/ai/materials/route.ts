@@ -52,7 +52,7 @@ export async function POST(request: Request) {
   const materialIds = Array.isArray(body.materialIds) ? body.materialIds as string[] : [];
   const action = typeof body.action === "string" ? body.action : "zusammenfassung";
   const requestedCardCount = Number(body.cardCount);
-  const cardCount = Math.max(5, Math.min(30, Number.isFinite(requestedCardCount) ? Math.round(requestedCardCount) : 10));
+  const cardCount = Math.max(5, Number.isFinite(requestedCardCount) ? Math.round(requestedCardCount) : 10);
   if (materialIds.length === 0) {
     return NextResponse.json({ error: "Wähle mindestens eine Unterlage aus." }, { status: 400 });
   }

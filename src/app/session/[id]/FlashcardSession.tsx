@@ -1,19 +1,24 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 type Card = { id: string; front: string; back: string };
 
-export default function FlashcardSession({ title, initialCards }: {
+export default function FlashcardSession({ deckId, title, initialCards }: {
+  deckId: string;
   title: string;
   initialCards: Card[];
 }) {
+  const router = useRouter();
   const [index, setIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
   const [known, setKnown] = useState(0);
   const [unknown, setUnknown] = useState(0);
   const [done, setDone] = useState(false);
+  const [earnedXp, setEarnedXp] = useState(0);
+  const [xpError, setXpError] = useState("");
 
   async function rate(isKnown: boolean) {
     if (isKnown) setKnown((value) => value + 1);
@@ -25,9 +30,20 @@ export default function FlashcardSession({ title, initialCards }: {
       setDone(true);
       if (finalKnown === initialCards.length) {
         const supabase = createClient();
-        await supabase.rpc("award_flashcard_xp", {
+        const earned = initialCards.length * 0.5;
+        const { error } = await supabase.rpc("award_flashcard_xp", {
+          p_deck_id: deckId,
           p_card_count: initialCards.length,
         });
+        if (error) {
+          const fallback = await supabase.rpc("award_xp", { p_amount: earned });
+          if (fallback.error) {
+            console.error("XP konnte nicht gutgeschrieben werden:", fallback.error);
+            setXpError("Die XP konnten nicht gespeichert werden. Bitte versuche es erneut.");
+          }
+        }
+        setEarnedXp(earned);
+        router.refresh();
       }
     } else {
       setIndex((value) => value + 1);
@@ -52,8 +68,9 @@ export default function FlashcardSession({ title, initialCards }: {
         <h3>Lernrunde abgeschlossen</h3>
         <p><strong>{known}</strong> gewusst · <strong>{unknown}</strong> wiederholen</p>
         {known === initialCards.length && (
-          <p><strong>+{(initialCards.length * 0.5).toFixed(1).replace(".0", "")} XP</strong> für diese perfekte Runde</p>
+          <p><strong>+{earnedXp.toFixed(1).replace(".0", "")} XP</strong> für diese perfekte Runde</p>
         )}
+        {xpError && <p className="form-message">{xpError}</p>}
         <button type="button" className="primary-button" onClick={restart}>Noch einmal üben</button>
       </div>
     );

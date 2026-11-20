@@ -13,7 +13,7 @@ export default async function EnglishPage() {
     .order("created_at", { ascending: false });
   const { data: decks } = await supabase
     .from("flashcard_decks")
-    .select("id, title, source_type")
+    .select("id, title, source_type, folder_name, card_count")
     .eq("owner_id", user.id)
     .eq("source_type", "english")
     .order("created_at", { ascending: false });

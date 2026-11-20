@@ -39,7 +39,7 @@ export default function FlashcardSessionCreator({
       setMessage("Bitte Sessionnamen und mindestens eine Unterlage auswählen.");
       return;
     }
-    const count = Math.max(5, Math.min(30, Number(cardCount) || 5));
+    const count = Math.max(5, Number(cardCount) || 5);
     setWorking(true);
     setMessage("");
 
@@ -129,7 +129,7 @@ export default function FlashcardSessionCreator({
   return (
     <form className="flashcard-session-create learn-form" onSubmit={createSession}>
       <label>Sessionname<input required value={name} onChange={(event) => setName(event.target.value)} placeholder="z. B. Kapitel 3 Wiederholung" /></label>
-      <label>Anzahl Karteikarten<input type="number" min={5} max={30} value={cardCount} onChange={(event) => setCardCount(Math.max(5, Math.min(30, Number(event.target.value) || 5)))} /></label>
+      <label>Anzahl Karteikarten<input type="number" min={5} value={cardCount} onChange={(event) => setCardCount(Math.max(5, Number(event.target.value) || 5))} /></label>
       {initialMaterials.map((material) => (
         <label className="check-row" key={material.id}>
           <input type="checkbox" checked={selected.includes(material.id)} onChange={() => setSelected((current) => current.includes(material.id) ? current.filter((id) => id !== material.id) : [...current, material.id])} />

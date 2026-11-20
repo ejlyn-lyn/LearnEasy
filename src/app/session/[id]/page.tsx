@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import FlashcardSession from "./FlashcardSession";
+import DeleteButton from "@/app/DeleteButton";
 
 export default async function SessionPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -29,9 +30,10 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
         <Link className="back-link" href="/dashboard">← Zum Dashboard</Link>
         <header className="module-detail-header">
           <div><p className="eyebrow">KARTENSESSION</p><h1>{deck.title}</h1></div>
+          <DeleteButton kind="deck" id={deck.id} label={`Deck ${deck.title}`} redirectTo="/dashboard" />
         </header>
         <section className="panel">
-          <FlashcardSession title={deck.title} initialCards={cards ?? []} />
+          <FlashcardSession deckId={deck.id} title={deck.title} initialCards={cards ?? []} />
         </section>
       </div>
     </main>

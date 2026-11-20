@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import DeleteButton from "@/app/DeleteButton";
 
 type Vocabulary = {
   id: string;
@@ -11,7 +12,7 @@ type Vocabulary = {
   translation: string;
   source: string;
 };
-type FlashcardDeck = { id: string; title: string; source_type: string };
+type FlashcardDeck = { id: string; title: string; source_type: string; folder_name: string; card_count: number };
 
 export default function EnglishClient({ initialVocabulary, initialDecks }: { initialVocabulary: Vocabulary[]; initialDecks: FlashcardDeck[] }) {
   const router = useRouter();
@@ -22,7 +23,7 @@ export default function EnglishClient({ initialVocabulary, initialDecks }: { ini
   const [quizIndex, setQuizIndex] = useState(0);
   const [answer, setAnswer] = useState("");
   const [quizResult, setQuizResult] = useState("");
-  const [cardCount, setCardCount] = useState(10);
+  const [folderName, setFolderName] = useState("Meine Karteikarten");
 
   async function addWord(event: React.FormEvent) {
     event.preventDefault();
@@ -54,22 +55,27 @@ export default function EnglishClient({ initialVocabulary, initialDecks }: { ini
     try {
       const XLSX = await import("xlsx");
       const workbook = XLSX.read(await file.arrayBuffer(), { type: "array" });
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json<(string | number)[]>(sheet, {
-        header: 1,
-        defval: "",
-        raw: false,
-      });
+      const sheets = workbook.SheetNames.map((sheetName) => {
+        const rows = XLSX.utils.sheet_to_json<(string | number)[]>(workbook.Sheets[sheetName], {
+          header: 1,
+          defval: "",
+          raw: false,
+        });
+        const header = (rows[0] ?? []).map((cell) => String(cell).toLowerCase());
+        const hasHeader = header.some((cell) =>
+          /(engl|term|vocab|deutsch|german|translation|übersetzung)/.test(cell),
+        );
+        const words = rows
+          .slice(hasHeader ? 1 : 0)
+          .map((row) => ({
+            term: String(row[0] ?? "").trim(),
+            translation: String(row[1] ?? "").trim(),
+          }))
+          .filter((word) => word.term && word.translation);
+        return { sheetName, words };
+      }).filter((sheet) => sheet.words.length > 0);
 
-      const words = rows
-        .slice(rows[0]?.some((cell) => String(cell).toLowerCase().includes("engl")) ? 1 : 0)
-        .map((row) => ({
-          term: String(row[0] ?? "").trim(),
-          translation: String(row[1] ?? "").trim(),
-        }))
-        .filter((word) => word.term && word.translation);
-
-      if (words.length === 0) {
+      if (sheets.length === 0) {
         setMessage("Keine Vokabeln gefunden. Verwende zwei Spalten: Englisch und Deutsch.");
         setLoading(false);
         return;
@@ -78,33 +84,35 @@ export default function EnglishClient({ initialVocabulary, initialDecks }: { ini
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      const limitedWords = words.slice(0, Math.max(5, cardCount));
+      const allWords = sheets.flatMap((sheet) =>
+        sheet.words.map((word) => ({
+          ...word,
+          source: `${file.name} – ${sheet.sheetName}`,
+        })),
+      );
       const { error } = await supabase.from("vocabulary").insert(
-        limitedWords.map((word) => ({
+        allWords.map((word) => ({
           owner_id: user.id,
           term: word.term,
           translation: word.translation,
-          source: file.name,
+          source: word.source,
         })),
       );
       if (error) setMessage(error.message);
       else {
-        setMessage(`${limitedWords.length} Vokabeln importiert.`);
+        let deckCount = 0;
+        for (const sheet of sheets) {
+          await createVocabularyDeck(sheet.words, `${file.name} – ${sheet.sheetName}`);
+          deckCount += 1;
+        }
+        setMessage(`${allWords.length} Vokabeln aus ${deckCount} Blatt/Blättern importiert.`);
         router.refresh();
-        await createVocabularyDeck(limitedWords, file.name);
       }
     } catch {
       setMessage("Die Datei konnte nicht gelesen werden.");
     }
     setLoading(false);
     event.target.value = "";
-  }
-
-  async function deleteWord(id: string) {
-    const supabase = createClient();
-    const { error } = await supabase.from("vocabulary").delete().eq("id", id);
-    if (error) setMessage(error.message);
-    else router.refresh();
   }
 
   function checkAnswer() {
@@ -134,6 +142,7 @@ export default function EnglishClient({ initialVocabulary, initialDecks }: { ini
         title,
         source_type: "english",
         card_count: words.length,
+        folder_name: folderName.trim() || "Meine Karteikarten",
       })
       .select("id")
       .single();
@@ -161,15 +170,23 @@ export default function EnglishClient({ initialVocabulary, initialDecks }: { ini
         {initialDecks.length > 0 && (
           <section className="panel flashcard-deck-list">
             <div className="panel-heading"><div><h2>Meine Karteikarten-Sessions</h2><p>{initialDecks.length} Deck(s)</p></div></div>
-            <div className="session-card-list">
-              {initialDecks.map((deck) => (
-                <Link className="session-card" href={`/session/${deck.id}`} key={deck.id}>
-                  <span className="activity-icon">A</span>
-                  <div><strong>{deck.title}</strong><small>Karteikarten lernen</small></div>
-                  <span>→</span>
-                </Link>
-              ))}
-            </div>
+            {Array.from(new Set(initialDecks.map((deck) => deck.folder_name || "Meine Karteikarten"))).map((folder) => (
+              <div className="deck-folder" key={folder}>
+                <h3>▾ Ordner: {folder}</h3>
+                <div className="session-card-list">
+                  {initialDecks.filter((deck) => (deck.folder_name || "Meine Karteikarten") === folder).map((deck) => (
+                    <div className="session-card-with-delete" key={deck.id}>
+                      <Link className="session-card" href={`/session/${deck.id}`}>
+                        <span className="activity-icon">A</span>
+                        <div><strong>{deck.title}</strong><small>{deck.card_count || "Alle"} Karteikarten lernen</small></div>
+                        <span>→</span>
+                      </Link>
+                      <DeleteButton kind="deck" id={deck.id} label={`Deck ${deck.title}`} compact />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
           </section>
         )}
 
@@ -177,10 +194,12 @@ export default function EnglishClient({ initialVocabulary, initialDecks }: { ini
           <section className="panel social-panel">
             <div className="panel-heading"><div><h2>Vokabeln importieren</h2><p>CSV oder Excel, je Zeile zwei Spalten</p></div></div>
             <form onSubmit={(event) => event.preventDefault()} className="learn-form">
+              <label>Ordner / Einheit
+                <input value={folderName} onChange={(event) => setFolderName(event.target.value)} placeholder="z. B. Unit 1" />
+              </label>
               <label>Datei auswählen
                 <input type="file" accept=".csv,.xlsx,.xls" onChange={importFile} disabled={loading} />
               </label>
-              <label>Anzahl Karteikarten<input type="number" min={5} max={30} value={cardCount} onChange={(event) => setCardCount(Math.max(5, Math.min(30, Number(event.target.value) || 5)))} /></label>
             </form>
             <form onSubmit={addWord} className="learn-form">
               <label>Englisch<input value={term} onChange={(event) => setTerm(event.target.value)} placeholder="apple" required /></label>
@@ -217,7 +236,7 @@ export default function EnglishClient({ initialVocabulary, initialDecks }: { ini
               <div className="vocabulary-row" key={word.id}>
                 <div><strong>{word.term}</strong><span>{word.translation}</span></div>
                 <small>{word.source}</small>
-                <button type="button" aria-label={`${word.term} löschen`} onClick={() => deleteWord(word.id)}>×</button>
+                <DeleteButton kind="vocabulary" id={word.id} label={`Vokabel ${word.term}`} compact />
               </div>
             ))
           )}

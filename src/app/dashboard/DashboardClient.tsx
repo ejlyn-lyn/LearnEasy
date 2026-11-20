@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import DeleteButton from "@/app/DeleteButton";
+import { formatXp, getLevelInfo } from "@/lib/xp";
 
 type Module = {
   id: string;
@@ -14,7 +16,7 @@ type Module = {
   is_private: boolean;
 };
 type Session = { id: string; name: string; activity_type: string; privacy: string; module_id: string };
-type Material = { id: string; name: string; file_type: string | null; size_bytes: number; ai_status: string; module_id: string; session_id: string | null };
+type Material = { id: string; name: string; file_path: string | null; file_type: string | null; size_bytes: number; ai_status: string; module_id: string; session_id: string | null };
 type Deck = { id: string; title: string; session_id: string | null };
 type Props = { email: string; displayName: string; xp: number; modules: Module[]; sessions: Session[]; materials: Material[]; decks: Deck[] };
 
@@ -38,8 +40,10 @@ export default function DashboardClient({ email, displayName, xp, modules, sessi
   const [activityType, setActivityType] = useState("lesen");
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
 
-  const level = Math.floor(xp / 300) + 1;
-  const levelProgress = xp % 300;
+  const levelInfo = getLevelInfo(xp);
+  const level = levelInfo.level;
+  const levelProgress = formatXp(levelInfo.levelXp);
+  const levelGoal = formatXp(levelInfo.nextLevelXp);
   const initials = displayName.slice(0, 2).toUpperCase();
   const deckBySessionId = new Map(
     decks
@@ -208,7 +212,7 @@ export default function DashboardClient({ email, displayName, xp, modules, sessi
           ))}
         </nav>
         <div className="sidebar-bottom">
-          <div className="profile-mini"><div className="avatar">{initials}</div><div><strong>{displayName}</strong><span>Level {level} · {xp} XP</span></div><form action="/auth/signout" method="post"><button className="logout-button" type="submit" aria-label="Abmelden">→</button></form></div>
+          <div className="profile-mini"><div className="avatar">{initials}</div><div><strong>{displayName}</strong><span>Level {level} · {formatXp(xp)} XP</span></div><form action="/auth/signout" method="post"><button className="logout-button" type="submit" aria-label="Abmelden">→</button></form></div>
         </div>
       </aside>
 
@@ -221,18 +225,21 @@ export default function DashboardClient({ email, displayName, xp, modules, sessi
           <div className="welcome-row"><div><p className="eyebrow">LERNÜBERSICHT</p><h1>Willkommen, {displayName} <span className="wave">✦</span></h1><p className="subtitle">Erstelle dein erstes Modul oder eine neue Lernsession.</p></div><button className="primary-button" type="button" onClick={() => setSessionOpen(true)}><span>✦</span> Neue Unterrichtssession</button></div>
 
           <section className="stats-grid">
-            <div className="stat-card stat-highlight"><div className="stat-icon xp-icon">✦</div><div><span className="stat-label">GESAMTE XP</span><strong>{xp} <small>XP</small></strong><em>Serververwalteter Fortschritt</em></div></div>
-            <div className="stat-card"><div className="stat-icon level-icon">{level}</div><div><span className="stat-label">AKTUELLES LEVEL</span><strong>Level {level}</strong><em>{levelProgress} / 300 XP in diesem Level</em></div></div>
+            <div className="stat-card stat-highlight"><div className="stat-icon xp-icon">✦</div><div><span className="stat-label">GESAMTE XP</span><strong>{formatXp(xp)} <small>XP</small></strong><em>Serververwalteter Fortschritt</em></div></div>
+            <div className="stat-card"><div className="stat-icon level-icon">{level}</div><div><span className="stat-label">AKTUELLES LEVEL</span><strong>Level {level}</strong><em>{levelProgress} / {levelGoal} XP in diesem Level</em></div></div>
             <div className="stat-card"><div className="stat-icon streak-icon">▣</div><div><span className="stat-label">UNTERRICHTSSESSIONS</span><strong>{sessions.length}</strong><em>{materials.length} hochgeladene Unterlage(n)</em></div></div>
           </section>
 
           <div className="section-heading"><div><h2>Meine Module</h2><p>{modules.length === 0 ? "Noch keine Module vorhanden" : "Deine Lernbereiche"}</p></div><button className="text-button" type="button" onClick={() => setModuleOpen(true)}>+ Neues Modul</button></div>
           <section className="module-grid">
             {modules.map((module, index) => (
-              <Link className="module-card module-card-link" href={`/module/${module.id}`} key={module.id}>
-                <div className={`module-icon ${index % 3 === 0 ? "violet" : index % 3 === 1 ? "cyan" : "amber"}`}>{module.is_it_module ? "IT" : module.name.slice(0, 2).toUpperCase()}</div>
-                <div className="module-card-body"><div className="module-title-row"><h3>{module.name}</h3></div><p>{module.description || (module.is_private ? "Privates Modul" : "Öffentliches Modul")}</p><div className="progress-meta"><span>{module.is_it_module ? "IT-Modul · Smartlearn vorbereitet" : "Eigenes Lernmodul"}</span></div><span className="module-continue">Modul öffnen <span>→</span></span></div>
-              </Link>
+              <article className="module-card module-card-link" key={module.id}>
+                <DeleteButton kind="module" id={module.id} label={`Modul ${module.name}`} compact />
+                <Link href={`/module/${module.id}`}>
+                  <div className={`module-icon ${index % 3 === 0 ? "violet" : index % 3 === 1 ? "cyan" : "amber"}`}>{module.is_it_module ? "IT" : module.name.slice(0, 2).toUpperCase()}</div>
+                  <div className="module-card-body"><div className="module-title-row"><h3>{module.name}</h3></div><p>{module.description || (module.is_private ? "Privates Modul" : "Öffentliches Modul")}</p><div className="progress-meta"><span>{module.is_it_module ? "IT-Modul · Smartlearn vorbereitet" : "Eigenes Lernmodul"}</span></div><span className="module-continue">Modul öffnen <span>→</span></span></div>
+                </Link>
+              </article>
             ))}
             <button className="add-module" type="button" onClick={() => setModuleOpen(true)}><span>+</span><strong>Neues Modul</strong><small>Eigenes Lernfach hinzufügen</small></button>
           </section>
@@ -248,15 +255,17 @@ export default function DashboardClient({ email, displayName, xp, modules, sessi
                     (() => {
                       const deck = findDeckForSession(session);
                       return (
-                    <Link
-                      className={`activity-item ${deck ? "activity-item-link" : ""}`}
-                      href={deck ? `/session/${deck.id}` : "#"}
-                      key={session.id}
-                    >
-                      <div className="activity-icon">{session.activity_type === "karteikarten" ? "A" : "✓"}</div>
-                      <div className="activity-text"><strong>{session.name}</strong><span>{session.activity_type} · {session.privacy === "private" ? "Privat" : "Öffentlich"}</span></div>
-                      {deck && <span className="activity-open">Lernen →</span>}
-                    </Link>
+                    <div className="activity-row-with-delete" key={session.id}>
+                      <Link
+                        className={`activity-item ${deck ? "activity-item-link" : ""}`}
+                        href={deck ? `/session/${deck.id}` : "#"}
+                      >
+                        <div className="activity-icon">{session.activity_type === "karteikarten" ? "A" : "✓"}</div>
+                        <div className="activity-text"><strong>{session.name}</strong><span>{session.activity_type} · {session.privacy === "private" ? "Privat" : "Öffentlich"}</span></div>
+                        {deck && <span className="activity-open">Lernen →</span>}
+                      </Link>
+                      <DeleteButton kind="session" id={session.id} label={`Session ${session.name}`} compact />
+                    </div>
                       );
                     })()
                   ))}
@@ -271,9 +280,12 @@ export default function DashboardClient({ email, displayName, xp, modules, sessi
               ) : (
                 <div className="activity-list">
                   {materials.slice(0, 5).map((material) => (
-                    <div className="activity-item" key={material.id}>
-                      <div className="activity-icon">▤</div>
-                      <div className="activity-text"><strong>{material.name}</strong><span>{material.ai_status} · {Math.max(1, Math.round(material.size_bytes / 1024))} KB</span></div>
+                    <div className="activity-row-with-delete" key={material.id}>
+                      <div className="activity-item">
+                        <div className="activity-icon">▤</div>
+                        <div className="activity-text"><strong>{material.name}</strong><span>{material.ai_status} · {Math.max(1, Math.round(material.size_bytes / 1024))} KB</span></div>
+                      </div>
+                      <DeleteButton kind="material" id={material.id} storagePath={material.file_path ?? undefined} label={`Unterlage ${material.name}`} compact />
                     </div>
                   ))}
                 </div>

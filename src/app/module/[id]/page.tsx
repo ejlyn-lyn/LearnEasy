@@ -3,6 +3,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import ModuleClient from "./ModuleClient";
 import FlashcardSessionCreator from "./FlashcardSessionCreator";
+import DeleteButton from "@/app/DeleteButton";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -33,7 +34,7 @@ export default async function ModulePage({ params }: Props) {
       .order("created_at", { ascending: false }),
     supabase
       .from("materials")
-      .select("id, name, file_type, size_bytes, ai_status, session_id, created_at")
+      .select("id, name, file_path, file_type, size_bytes, ai_status, session_id, created_at")
       .eq("module_id", id)
       .eq("owner_id", user.id)
       .order("created_at", { ascending: false }),
@@ -70,7 +71,10 @@ export default async function ModulePage({ params }: Props) {
             <h1>{module.name}</h1>
             <p>{module.description || module.subject || "Eigener Lernbereich"}</p>
           </div>
-          <span className={`privacy-badge ${module.is_private ? "" : "public"}`}>{module.is_private ? "Privat" : "Öffentlich"}</span>
+          <div className="header-actions">
+            <span className={`privacy-badge ${module.is_private ? "" : "public"}`}>{module.is_private ? "Privat" : "Öffentlich"}</span>
+            <DeleteButton kind="module" id={module.id} label={`Modul ${module.name}`} redirectTo="/dashboard" />
+          </div>
         </header>
 
         {module.is_it_module && (
@@ -118,11 +122,14 @@ export default async function ModulePage({ params }: Props) {
             {decks.length > 0 && (
               <div className="session-card-list module-deck-list">
                 {decks.map((deck) => (
-                  <Link className="session-card" href={`/session/${deck.id}`} key={deck.id}>
-                    <span className="activity-icon">A</span>
-                    <div><strong>{deck.title}</strong><small>Karteikarten-Session öffnen</small></div>
-                    <span>→</span>
-                  </Link>
+                  <div className="session-card-with-delete" key={deck.id}>
+                    <Link className="session-card" href={`/session/${deck.id}`}>
+                      <span className="activity-icon">A</span>
+                      <div><strong>{deck.title}</strong><small>Karteikarten-Session öffnen</small></div>
+                      <span>→</span>
+                    </Link>
+                    <DeleteButton kind="deck" id={deck.id} label={`Deck ${deck.title}`} compact />
+                  </div>
                 ))}
               </div>
             )}
@@ -134,16 +141,18 @@ export default async function ModulePage({ params }: Props) {
                   (() => {
                     const deck = findDeckForSession(session);
                     return (
+                      <div className="activity-row-with-delete" key={session.id}>
                       <Link
                         className={`activity-item ${deck ? "activity-item-link" : ""}`}
                         href={deck ? `/session/${deck.id}` : "#"}
-                        key={session.id}
                         aria-disabled={!deck}
                       >
                         <div className="activity-icon">{session.activity_type === "karteikarten" ? "A" : "✓"}</div>
                         <div className="activity-text"><strong>{session.name}</strong><span>{session.activity_type} · {session.privacy === "private" ? "Privat" : "Öffentlich"}</span></div>
                         {deck && <span className="activity-open">Lernen →</span>}
                       </Link>
+                      <DeleteButton kind="session" id={session.id} label={`Session ${session.name}`} compact />
+                      </div>
                     );
                   })()
                 ))}
@@ -161,6 +170,7 @@ export default async function ModulePage({ params }: Props) {
                   <article className="activity-item" key={material.id}>
                     <div className="activity-icon">▤</div>
                     <div className="activity-text"><strong>{material.name}</strong><span>{material.ai_status} · {Math.max(1, Math.round(material.size_bytes / 1024))} KB</span></div>
+                    <DeleteButton kind="material" id={material.id} storagePath={material.file_path ?? undefined} label={`Unterlage ${material.name}`} compact />
                   </article>
                 ))}
               </div>

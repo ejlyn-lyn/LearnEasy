@@ -1,6 +1,7 @@
 alter table public.flashcard_decks
   add column if not exists session_id uuid references public.sessions(id) on delete set null,
-  add column if not exists card_count integer not null default 0;
+  add column if not exists card_count integer not null default 0,
+  add column if not exists folder_name text not null default 'Meine Karteikarten';
 
 alter table public.profiles alter column xp type numeric(12,1) using xp::numeric(12,1);
 alter table public.clans alter column xp type numeric(12,1) using xp::numeric(12,1);

@@ -8,7 +8,7 @@ export default async function SettingsPage() {
   if (!user) redirect("/login");
   const { data: profile } = await supabase
     .from("profiles")
-    .select("display_name, friend_code, theme, accent, xp")
+    .select("display_name, friend_code, theme, accent, birthday, xp")
     .eq("id", user.id)
     .maybeSingle();
   return (
@@ -18,6 +18,7 @@ export default async function SettingsPage() {
       friendCode={profile?.friend_code ?? user.id.replace(/-/g, "").slice(0, 8).toUpperCase()}
       theme={profile?.theme ?? "dark"}
       accent={profile?.accent ?? "violet"}
+      birthday={profile?.birthday ?? ""}
       xp={profile?.xp ?? 0}
     />
   );

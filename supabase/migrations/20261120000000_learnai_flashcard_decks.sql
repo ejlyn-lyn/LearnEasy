@@ -6,12 +6,14 @@ create table if not exists public.flashcard_decks (
   source_type text not null default 'material',
   session_id uuid references public.sessions(id) on delete set null,
   card_count integer not null default 0,
+  folder_name text not null default 'Meine Karteikarten',
   created_at timestamptz not null default now()
 );
 
 alter table public.flashcard_decks
   add column if not exists session_id uuid references public.sessions(id) on delete set null,
-  add column if not exists card_count integer not null default 0;
+  add column if not exists card_count integer not null default 0,
+  add column if not exists folder_name text not null default 'Meine Karteikarten';
 
 create table if not exists public.flashcards (
   id uuid primary key default gen_random_uuid(),
